@@ -1,0 +1,119 @@
+// Это итоговая схема базы данных в лабораторной работе.
+// Комментарии показывают, из каких CSV-полей собирается каждая таблица.
+
+Table dim_country {
+  country_id integer [pk, increment]
+  name varchar(100) [not null, unique, note: "CSV: customer_country, seller_country, store_country, supplier_country"]
+}
+
+Table dim_city {
+  city_id integer [pk, increment]
+  name varchar(100) [not null, note: "CSV: store_city или supplier_city"]
+  state varchar(100) [not null, note: "CSV: store_state; для supplier ставится '(unknown)'"]
+  country_id integer [not null, ref: > dim_country.country_id, note: "Через store_country или supplier_country"]
+
+  indexes {
+    (name, state, country_id) [unique]
+  }
+}
+
+Table dim_category {
+  category_id integer [pk, increment]
+  name varchar(100) [not null, unique, note: "CSV: product_category"]
+}
+
+Table dim_customer {
+  customer_id integer [pk, note: "Глобальный ключ: file_id * 100000 + sale_customer_id"]
+  file_id integer [not null, note: "Номер CSV-файла, нужен из-за пересекающихся ID"]
+  source_customer_id integer [not null, note: "CSV: sale_customer_id"]
+  first_name varchar(100) [note: "CSV: customer_first_name"]
+  last_name varchar(100) [note: "CSV: customer_last_name"]
+  age integer [note: "CSV: customer_age"]
+  email varchar(200) [note: "CSV: customer_email"]
+  country_id integer [ref: > dim_country.country_id, note: "Из customer_country"]
+  postal_code varchar(20) [note: "CSV: customer_postal_code"]
+  pet_type varchar(50) [note: "CSV: customer_pet_type"]
+  pet_name varchar(100) [note: "CSV: customer_pet_name"]
+  pet_breed varchar(100) [note: "CSV: customer_pet_breed"]
+
+  indexes {
+    (file_id, source_customer_id) [unique]
+  }
+}
+
+Table dim_seller {
+  seller_id integer [pk, note: "Глобальный ключ: file_id * 100000 + sale_seller_id"]
+  file_id integer [not null, note: "Номер CSV-файла"]
+  source_seller_id integer [not null, note: "CSV: sale_seller_id"]
+  first_name varchar(100) [note: "CSV: seller_first_name"]
+  last_name varchar(100) [note: "CSV: seller_last_name"]
+  email varchar(200) [note: "CSV: seller_email"]
+  country_id integer [ref: > dim_country.country_id, note: "Из seller_country"]
+  postal_code varchar(20) [note: "CSV: seller_postal_code"]
+
+  indexes {
+    (file_id, source_seller_id) [unique]
+  }
+}
+
+Table dim_product {
+  product_id integer [pk, note: "Глобальный ключ: file_id * 100000 + sale_product_id"]
+  file_id integer [not null, note: "Номер CSV-файла"]
+  source_product_id integer [not null, note: "CSV: sale_product_id"]
+  name varchar(200) [note: "CSV: product_name"]
+  category_id integer [ref: > dim_category.category_id, note: "Из product_category"]
+  price numeric(12,2) [note: "CSV: product_price"]
+  quantity integer [note: "CSV: product_quantity"]
+  pet_category varchar(100) [note: "CSV: pet_category"]
+  weight numeric(10,2) [note: "CSV: product_weight"]
+  color varchar(50) [note: "CSV: product_color"]
+  size varchar(50) [note: "CSV: product_size"]
+  brand varchar(100) [note: "CSV: product_brand"]
+  material varchar(100) [note: "CSV: product_material"]
+  description text [note: "CSV: product_description"]
+  rating numeric(3,1) [note: "CSV: product_rating"]
+  reviews integer [note: "CSV: product_reviews"]
+  release_date date [note: "CSV: product_release_date"]
+  expiry_date date [note: "CSV: product_expiry_date"]
+
+  indexes {
+    (file_id, source_product_id) [unique]
+  }
+}
+
+Table dim_store {
+  store_id integer [pk, note: "hashtext(store_name, store_location, store_city, store_state, store_country, store_phone, store_email)"]
+  name varchar(200) [note: "CSV: store_name"]
+  location varchar(200) [note: "CSV: store_location"]
+  city_id integer [not null, ref: > dim_city.city_id, note: "Через store_city/store_state/store_country"]
+  phone varchar(50) [note: "CSV: store_phone"]
+  email varchar(200) [note: "CSV: store_email"]
+}
+
+Table dim_supplier {
+  supplier_id integer [pk, note: "hashtext(supplier_name, supplier_contact, supplier_email, supplier_phone, supplier_address, supplier_city, supplier_country)"]
+  name varchar(200) [note: "CSV: supplier_name"]
+  contact varchar(200) [note: "CSV: supplier_contact"]
+  email varchar(200) [note: "CSV: supplier_email"]
+  phone varchar(50) [note: "CSV: supplier_phone"]
+  address varchar(200) [note: "CSV: supplier_address"]
+  city_id integer [not null, ref: > dim_city.city_id, note: "Через supplier_city/supplier_country"]
+}
+
+Table fact_sales {
+  sale_id bigint [pk, note: "Технический ключ: raw_data.row_id"]
+  source_file_id integer [not null, note: "Из raw_data.file_id"]
+  source_sale_id integer [not null, note: "CSV: id"]
+  customer_id integer [not null, ref: > dim_customer.customer_id]
+  seller_id integer [not null, ref: > dim_seller.seller_id]
+  product_id integer [not null, ref: > dim_product.product_id]
+  store_id integer [not null, ref: > dim_store.store_id]
+  supplier_id integer [not null, ref: > dim_supplier.supplier_id]
+  sale_date date [not null, note: "CSV: sale_date"]
+  quantity integer [note: "CSV: sale_quantity"]
+  total_price numeric(12,2) [note: "CSV: sale_total_price"]
+
+  indexes {
+    (source_file_id, source_sale_id) [unique]
+  }
+}
